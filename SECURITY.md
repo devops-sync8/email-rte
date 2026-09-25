@@ -34,5 +34,7 @@ Until 1.0, only the latest released minor version receives security fixes.
 - `EmailTokens.ReplaceInHtml` (.NET) merges fields into HTML from the renderer
   or elsewhere: values are HTML-encoded, and an address attribute that a field
   would give an unsafe scheme is emptied. It does not make untrusted HTML safe;
-  merge only templates you trust or produced by the renderer. Field values used
-  inside `<style>` or `<script>` blocks are not supported.
+  merge only templates you trust or produced by the renderer. A merge field
+  inside a `<style>` or `<script>` block throws `UnsafeMergeFieldException`,
+  since no encoding makes a value safe there. (The editor and renderer never
+  produce such blocks.)

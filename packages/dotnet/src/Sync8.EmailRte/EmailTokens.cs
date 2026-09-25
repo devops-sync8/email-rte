@@ -24,6 +24,20 @@ public sealed class MissingTokenException(IReadOnlyList<string> keys)
 }
 
 /// <summary>
+/// A merge field was found inside a <c>&lt;style&gt;</c> or <c>&lt;script&gt;</c> block, where
+/// HTML encoding cannot make a value safe. Move the field out of the block.
+/// </summary>
+public sealed class UnsafeMergeFieldException(string element, string field)
+    : InvalidOperationException($"Merge field {field} is inside a <{element}> block; fields are not supported there.")
+{
+    /// <summary>The element containing the field (<c>style</c> or <c>script</c>).</summary>
+    public string Element { get; } = element;
+
+    /// <summary>The merge field as written in the template.</summary>
+    public string Field { get; } = field;
+}
+
+/// <summary>
 /// Replaces merge fields — <c>{{key}}</c>, or <c>{{key|fallback}}</c> with a fallback for
 /// empty values — in email templates, such as HTML saved from the rich text editor
 /// (<c>getHtml()</c>) or any other HTML. Values are plain text and are HTML-encoded.
@@ -35,7 +49,9 @@ public sealed class MissingTokenException(IReadOnlyList<string> keys)
 /// <para>
 /// The HTML is read the way a browser reads it (tags, quoted and unquoted attributes,
 /// comments), in one pass: text that merely looks like an attribute is text, and values
-/// are never scanned again for fields.
+/// are never scanned again for fields. The contents of <c>&lt;style&gt;</c> and
+/// <c>&lt;script&gt;</c> blocks are copied as they are, and a merge field inside one
+/// throws <see cref="UnsafeMergeFieldException"/>: no encoding makes a value safe there.
 /// </para>
 /// </summary>
 public static partial class EmailTokens
@@ -74,10 +90,12 @@ public static partial class EmailTokens
     }
 
     /// <summary>Replace merge fields in an HTML template.</summary>
+    /// <exception cref="UnsafeMergeFieldException">A merge field is inside a style or script block.</exception>
     public static string ReplaceInHtml(string html, IReadOnlyDictionary<string, string?> values, MissingTokenBehavior missing = MissingTokenBehavior.Empty)
         => ReplaceInHtml(html, Lookup(values), missing);
 
     /// <summary>Replace merge fields in an HTML template, looking values up with <paramref name="values"/>.</summary>
+    /// <exception cref="UnsafeMergeFieldException">A merge field is inside a style or script block.</exception>
     public static string ReplaceInHtml(string html, Func<string, string?> values, MissingTokenBehavior missing = MissingTokenBehavior.Empty)
     {
         ArgumentNullException.ThrowIfNull(html);
@@ -142,7 +160,8 @@ public static partial class EmailTokens
             }
             else if (lt + 1 < html.Length && char.IsAsciiLetter(html[lt + 1]))
             {
-                i = MergeTag(html, lt, sb, resolver);
+                i = MergeTag(html, lt, sb, resolver, out var tagName);
+                if (RawTextElements.Contains(tagName)) i = CopyRawText(html, i, tagName, sb);
             }
             else
             {
@@ -161,11 +180,12 @@ public static partial class EmailTokens
     /// <paramref name="sb"/>, merging fields in attribute values. Follows the HTML tokenizer:
     /// quotes only delimit a value right after '='. Returns the index after the tag.
     /// </summary>
-    private static int MergeTag(string html, int start, StringBuilder sb, Resolver resolver)
+    private static int MergeTag(string html, int start, StringBuilder sb, Resolver resolver, out string tagName)
     {
         var n = html.Length;
         var i = start + 1;
         while (i < n && !IsTagSpace(html[i]) && html[i] is not '/' and not '>') i++; // tag name
+        tagName = html[(start + 1)..i];
         var copied = start;
         while (i < n)
         {
@@ -213,6 +233,30 @@ public static partial class EmailTokens
         }
         sb.Append(html, copied, i - copied);
         return i;
+    }
+
+    /// <summary>Elements whose content is not HTML: copied as is, and never merged into.</summary>
+    private static readonly HashSet<string> RawTextElements = new(StringComparer.OrdinalIgnoreCase) { "style", "script" };
+
+    /// <summary>
+    /// Copies the content of a style or script element from <paramref name="start"/> up to its
+    /// end tag (the end tag is then read as HTML). Throws when the content holds a merge field.
+    /// </summary>
+    private static int CopyRawText(string html, int start, string element, StringBuilder sb)
+    {
+        var end = start;
+        while (true)
+        {
+            end = html.IndexOf("</" + element, end, StringComparison.OrdinalIgnoreCase);
+            if (end < 0) { end = html.Length; break; }
+            var after = end + 2 + element.Length;
+            if (after >= html.Length || IsTagSpace(html[after]) || html[after] is '/' or '>') break;
+            end = after; // e.g. </styles
+        }
+        var content = html[start..end];
+        if (Token().Match(content) is { Success: true } field) throw new UnsafeMergeFieldException(element.ToLowerInvariant(), field.Value);
+        sb.Append(content);
+        return end;
     }
 
     /// <summary>Removes leading and trailing C0 control characters and spaces, as browsers do with addresses.</summary>

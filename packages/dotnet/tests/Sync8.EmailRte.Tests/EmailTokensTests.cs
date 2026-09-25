@@ -97,6 +97,29 @@ public class EmailTokensTests
         Assert.Equal("<!--[if mso]><td width=\"&lt;b&gt;\"><![endif]--><p>1 < 2 &lt;b&gt;</p>", result);
     }
 
+    [Theory]
+    [InlineData("<style>p{color:{{brand}}}</style>", "style", "{{brand}}")]
+    [InlineData("<STYLE type=\"text/css\">a{} {{ x | red }}</STYLE >", "style", "{{ x | red }}")]
+    [InlineData("<script>var n = '{{name}}';</script>", "script", "{{name}}")]
+    [InlineData("<script><p>{{name}}</p></script>", "script", "{{name}}")]
+    public void ReplaceInHtml_RefusesFieldsInStyleAndScriptBlocks(string html, string element, string field)
+    {
+        var e = Assert.Throws<UnsafeMergeFieldException>(() => EmailTokens.ReplaceInHtml(html, Values));
+
+        Assert.Equal(element, e.Element);
+        Assert.Equal(field, e.Field);
+    }
+
+    [Fact]
+    public void ReplaceInHtml_StyleAndScriptBlocksWithoutFieldsAreCopied_FieldsAroundThemMerge()
+    {
+        const string html = "<style>p{color:red} a[title=\"<b>\"]{}</style><p>{{company}}</p><script>if (a < b) x = \"</p>\";</script><styles>{{company}}</styles>";
+
+        var result = EmailTokens.ReplaceInHtml(html, Values);
+
+        Assert.Equal("<style>p{color:red} a[title=\"<b>\"]{}</style><p>Acme</p><script>if (a < b) x = \"</p>\";</script><styles>Acme</styles>", result);
+    }
+
     [Fact]
     public void MissingBehavior_KeepAndError()
     {

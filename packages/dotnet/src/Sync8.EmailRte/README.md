@@ -7,7 +7,8 @@ dependency.
 - `EmailTokens`: fill merge fields (`{{firstName}}`, `{{company|the team}}`) in
   HTML and plain text with the same rules as the editor: values are HTML-encoded,
   link addresses are validated, and missing fields are removed, kept or reported
-  (`MissingTokenBehavior`).
+  (`MissingTokenBehavior`). A field inside a `<style>` or `<script>` block throws
+  `UnsafeMergeFieldException`.
 - `EmbeddedImages`: turn `data:` pictures in HTML into `cid:` inline attachments,
   which mail clients show (they do not show `data:` images).
 - `IEmailSender` / `SmtpEmailSender`: send HTML + text email over SMTP (MailKit),
