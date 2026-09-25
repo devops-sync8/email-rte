@@ -67,7 +67,8 @@ public static partial class ComposeEndpoints
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogError(ex, "Sending the composed email failed");
-                return Results.Problem(title: "Sending failed", detail: ex.Message, statusCode: StatusCodes.Status502BadGateway);
+                // The details (SMTP host, server replies) are logged, not returned to the caller.
+                return Results.Problem(title: "Sending failed", detail: "The mail server did not accept the message. See the server log for details.", statusCode: StatusCodes.Status502BadGateway);
             }
             return Results.Ok(new ComposeSendResponse($"Sent to {string.Join(", ", recipients)}."));
         });

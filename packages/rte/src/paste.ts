@@ -19,11 +19,12 @@
  * The clipboard is parsed in an inert document (nothing runs or loads) and
  * the output is rebuilt from escaped strings and an allow-list.
  */
-import { FONTS, escapeAttr, escapeText, isImageSource, normColor, normSize } from './render';
+import { FONTS, TOKEN_LINK, escapeAttr, escapeText, isImageSource, normColor, normSize } from './render';
 
 const PASTED_IMAGE = /^data:image\/(webp|bmp|avif);base64,[A-Za-z0-9+/]+={0,2}$/;
-/** Links kept from pasted HTML: web, mail and phone addresses, or a merge field address (`{{…}}`). */
-const PASTED_LINK = /^(https?:|mailto:|tel:|\{\{)/i;
+/** Links kept from pasted HTML: web, mail and phone addresses, or a merge field address (`{{…}}`, see TOKEN_LINK). */
+const PASTED_PROTOCOL = /^(https?:|mailto:|tel:)/i;
+const isPastedLink = (href: string) => PASTED_PROTOCOL.test(href) || TOKEN_LINK.test(href);
 
 export interface CleanOptions {
   /** Keep images: http(s) and embedded (data:) ones, and Word's local ones via `localImages` (default false). */
@@ -371,7 +372,7 @@ function computeFmt(el: Element, parent: Fmt, ctx: Ctx): Fmt {
   }
   if (tag === 'a') {
     const href = (el.getAttribute('href') ?? '').trim();
-    if (PASTED_LINK.test(href)) fmt.href = href;
+    if (isPastedLink(href)) fmt.href = href;
     // Link colour and underline come from the editor's link style.
     fmt.color = parent.color;
     fmt.u = parent.u;
@@ -520,7 +521,7 @@ function buttonMarkup(cell: Element, face: Element, text: string): string {
   const align = cell.parentElement?.closest('table')?.parentElement?.closest('td')?.getAttribute('align');
   const attrs = [
     `data-text="${escapeAttr(text)}"`,
-    `data-href="${escapeAttr(PASTED_LINK.test(href) ? href : '')}"`,
+    `data-href="${escapeAttr(isPastedLink(href) ? href : '')}"`,
     bg ? `data-background="${bg}"` : '',
     colour ? `data-color="${colour}"` : '',
     align === 'center' || align === 'right' ? `data-align="${align}"` : '',

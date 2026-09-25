@@ -26,6 +26,7 @@ import {
   isTokenKey,
   tokenText,
   asButton,
+  isLink,
   columnWidths,
   frameColorsOf,
   frameDeltas,
@@ -713,7 +714,7 @@ function createButtonDialog(root: HTMLElement, labels: Record<string, string>, h
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const link = href.value.trim();
-    if (link && !/^(https?:\/\/|mailto:|tel:|\{\{)/i.test(link)) return showError(labels.buttonLinkInvalid);
+    if (link && !isLink(link)) return showError(labels.buttonLinkInvalid);
     const value = asButton({ text: text.value, href: link, background: background.value, color: color.value, align: align.value });
     if (!value) return text.focus();
     handlers.onSave(value);

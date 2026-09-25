@@ -90,10 +90,59 @@ test('untrusted values are escaped or dropped', () => {
     { insert: 'm', attributes: { link: 'https://ok.test/"onmouseover="x' } },
     { insert: '\n', attributes: { align: 'center;color:red', header: 7, indent: 'x' } },
   ]);
-  assert.ok(out.includes('&lt;script&gt;alert(1)&lt;/script&gt; &amp; "q"'));
+  assert.ok(out.includes('&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;q&quot;'));
   assert.ok(!/javascript:|url\(|expression|comic|999px|onmouseover="/.test(out), out);
   assert.ok(out.includes('href="https://ok.test/&quot;onmouseover=&quot;x"'));
   assert.deepEqual(lintEmailHtml(out), []);
+});
+
+// Security review: text must never look like markup to code that post-processes the HTML.
+test('quotes in text are escaped, so text cannot pose as an attribute', () => {
+  const out = html([{ insert: `Details at href=" and src="data:image/png;base64,AAAA" it's\n` }]);
+  assert.ok(out.includes('href=&quot; and src=&quot;data:image/png;base64,AAAA&quot; it&#39;s'), out);
+  const { html: sent, images } = render.extractEmbeddedImages(out);
+  assert.equal(sent, out, 'text is not rewritten as an image');
+  assert.equal(images.length, 0);
+});
+
+test('a merge field only starts a link when a path, query, fragment or nothing follows it', () => {
+  const link = (href) => html([{ insert: 'x', attributes: { link: href } }, { insert: '\n' }]);
+  for (const ok of ['{{site}}', '{{site}}/account', '{{u}}?a=1', '{{u}}#top', '{{ u | https://x.test }}/p']) {
+    assert.ok(link(ok).includes('<a href='), ok);
+  }
+  for (const bad of ['{{zz}}javascript:alert(1)', '{{zz}}  javascript:alert(1)', '{{zz}}data:text/html,x', '{{a}}{{b}}']) {
+    assert.ok(!link(bad).includes('<a '), bad);
+  }
+  const out = html([{ insert: 'Details at href="' }, { insert: 'our site', attributes: { link: '{{zz}}javascript:alert(document.domain)' } }, { insert: '\n' }]);
+  assert.ok(!/javascript|<a /.test(out), out);
+});
+
+test('style overrides are numbers within limits', () => {
+  const out = html([{ insert: 'a\n' }, { insert: { section: { layout: '1-1', columns: [[{ insert: 'b\n' }], [{ insert: 'c\n' }]] } } }, { insert: 'd\n' }], {
+    blockSpacing: '0" onmouseover="alert(1)',
+    maxImageWidth: '600"><img src=x onerror=alert(1)>',
+    lineHeight: '1;color:red',
+  });
+  assert.ok(!/onmouseover|onerror|color:red/.test(out), out);
+  assert.ok(out.includes('margin:0 0 12px 0;') && out.includes('width="600"') && out.includes('line-height:150%'));
+  const clamped = html([{ insert: 'a\nb\n' }], { blockSpacing: 1e9, lineHeight: -3 });
+  assert.ok(clamped.includes('margin:0 0 100px 0;') && clamped.includes('line-height:50%'), clamped);
+});
+
+test('hostile structures render in bounded time and depth', () => {
+  const columns = Array.from({ length: 40000 }, () => [{ insert: 'a' }]);
+  let t = Date.now();
+  render.renderEmail({ ops: [{ insert: { section: { layout: '1-1', columns } } }, { insert: '\n' }] });
+  assert.ok(Date.now() - t < 2000, `extra columns took ${Date.now() - t} ms`);
+
+  let nested = [{ insert: 'deep\n' }];
+  for (let i = 0; i < 5000; i++) nested = [{ insert: { section: { layout: '1-1', columns: [nested, []] } } }, { insert: '\n' }];
+  t = Date.now();
+  const out = render.renderEmail({ ops: nested });
+  assert.ok(Date.now() - t < 2000);
+  assert.ok(!out.html.includes('deep') && !out.text.includes('deep'), 'sections nested more than once are dropped');
+  const twice = [{ insert: { section: { layout: '1-1', columns: [[{ insert: { section: { layout: '1-1', columns: [[{ insert: 'inner\n' }], []] } } }], []] } } }, { insert: '\n' }];
+  assert.ok(render.renderEmail({ ops: twice }).html.includes('inner'), 'a section in a column shows its content');
 });
 
 test('whitespace, blank lines, alignment and paragraph indents survive', () => {

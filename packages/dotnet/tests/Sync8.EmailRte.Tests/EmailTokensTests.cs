@@ -34,6 +34,69 @@ public class EmailTokensTests
         Assert.Equal("<a href=\"https://example.com/u?id=1&amp;t=2\">U</a> <a href=\"https://app.example.com/account?u=ann%2B1%40example.com&amp;x=1\">A</a> <a href=\"\">B</a> <a href=\"https://x.test/\">C</a>", result);
     }
 
+    // Security review: text that looks like an attribute must not hide a real address from validation.
+    [Theory]
+    [InlineData("<p>Details at href=\"<a href=\"{{zz}}javascript:alert(document.domain)\">our site</a></p>")]
+    [InlineData("<p>Details at href='<a href='{{zz}}javascript:alert(1)'>x</a></p>")]
+    [InlineData("<a href={{zz}}javascript:alert(1)>x</a>")]
+    [InlineData("<a/href=\"{{zz}}javascript:alert(1)\">x</a>")]
+    [InlineData("<a title=\"x\"href=\"{{zz}}javascript:alert(1)\">x</a>")]
+    [InlineData("<a href=\"java{{zz}}script:alert(1)\">x</a>")]
+    [InlineData("<a href=\"{{zz}}  jav&#x09;ascript:alert(1)\">x</a>")]
+    [InlineData("<a HREF = \"{{zz}}JavaScript:alert(1)\">x</a>")]
+    [InlineData("<img src=\"{{zz}}javascript:alert(1)\">")]
+    public void ReplaceInHtml_NeverProducesAScriptAddress(string html)
+    {
+        var result = EmailTokens.ReplaceInHtml(html, new Dictionary<string, string?>());
+
+        Assert.DoesNotContain("javascript:", result.Replace("\t", "").Replace("&#x09;", ""), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ReplaceInHtml_TextThatLooksLikeAnAttributeStaysText()
+    {
+        var result = EmailTokens.ReplaceInHtml("<p>Use href=\"{{site}}\" here</p>", Values);
+
+        Assert.Equal("<p>Use href=\"https://app.example.com\" here</p>", result);
+    }
+
+    [Fact]
+    public void ReplaceInHtml_ValuesAreNotScannedForFieldsAgain()
+    {
+        var values = new Dictionary<string, string?> { ["website"] = "https://attacker.example/c?t={{resetToken}}", ["resetToken"] = "SECRET-123" };
+
+        var result = EmailTokens.ReplaceInHtml("<a href=\"{{website}}\">site</a> <p>{{website}}</p> <img alt=\"{{website}}\">", values);
+
+        Assert.DoesNotContain("SECRET", result);
+        Assert.Contains("<a href=\"https://attacker.example/c?t={{resetToken}}\">", result);
+    }
+
+    [Fact]
+    public void ReplaceInHtml_AttributeValuesAreQuotedAndEncoded()
+    {
+        var values = new Dictionary<string, string?> { ["name"] = "x\" onerror=\"alert(1)", ["plain"] = "a b onerror=alert(1)" };
+
+        var result = EmailTokens.ReplaceInHtml("<img alt=\"{{name}}\" title={{plain}} src=\"cid:logo\">", values);
+
+        Assert.Equal("<img alt=\"x&quot; onerror=&quot;alert(1)\" title=\"a b onerror=alert(1)\" src=\"cid:logo\">", result);
+    }
+
+    [Fact]
+    public void ReplaceInHtml_AddressesAllowRelativeAndCid_WhenFieldsAreLater()
+    {
+        var result = EmailTokens.ReplaceInHtml("<a href=\"/u?e={{email}}\">u</a><img src=\"{{logo}}\">", new Dictionary<string, string?> { ["email"] = "a@b.c", ["logo"] = "cid:logo@x" });
+
+        Assert.Equal("<a href=\"/u?e=a%40b.c\">u</a><img src=\"cid:logo@x\">", result);
+    }
+
+    [Fact]
+    public void ReplaceInHtml_CommentsAndStrayAngleBracketsAreText()
+    {
+        var result = EmailTokens.ReplaceInHtml("<!--[if mso]><td width=\"{{w}}\"><![endif]--><p>1 < 2 {{w}}</p>", new Dictionary<string, string?> { ["w"] = "<b>" });
+
+        Assert.Equal("<!--[if mso]><td width=\"&lt;b&gt;\"><![endif]--><p>1 < 2 &lt;b&gt;</p>", result);
+    }
+
     [Fact]
     public void MissingBehavior_KeepAndError()
     {

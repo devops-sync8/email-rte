@@ -78,6 +78,16 @@ test('hostile web page: nothing executable, no tracking pixels, only safe links'
   assert.deepEqual(lintEmailHtml(out), []);
 });
 
+// Security review: a pasted link that only starts with a merge field must not hide another scheme.
+test('pasted links: a merge field address is kept, one hiding another scheme is not', async () => {
+  const out = await paste({
+    html: '<p>Read more href="<a href="{{zz}}javascript:alert(document.domain)">here</a> and <a href="{{site}}/account">account</a></p>',
+  });
+  assert.ok(!/javascript|\{\{zz\}\}/.test(out), out);
+  assert.ok(out.includes('href="{{site}}/account"'), out);
+  assert.ok(!(await h.page.evaluate(() => JSON.stringify(window.ed.getDelta()))).includes('javascript'), 'not in the stored Delta either');
+});
+
 test('plain text keeps line breaks and shows markup as text', async () => {
   const out = await paste({ text: 'Line <b>one</b>\nLine two' });
   assert.ok(out.includes('>Line &lt;b&gt;one&lt;/b&gt;</p>') && out.includes('>Line two</p>'), out);

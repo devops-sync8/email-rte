@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Sync8.EmailRte;
@@ -26,10 +27,16 @@ public sealed class MissingTokenException(IReadOnlyList<string> keys)
 /// Replaces merge fields — <c>{{key}}</c>, or <c>{{key|fallback}}</c> with a fallback for
 /// empty values — in email templates, such as HTML saved from the rich text editor
 /// (<c>getHtml()</c>) or any other HTML. Values are plain text and are HTML-encoded.
-/// In link addresses (<c>href</c>) a field that starts the address is used as is
-/// (<c>{{unsubscribeUrl}}</c>, <c>{{site}}/account</c>) and the result must be an
-/// http(s), mailto or tel address, otherwise the address is emptied; fields later in
-/// the address are URL-encoded.
+/// In address attributes (<c>href</c>, <c>src</c>, <c>background</c>, …) a field that
+/// starts the address is used as is (<c>{{unsubscribeUrl}}</c>, <c>{{site}}/account</c>)
+/// and the result must be an http(s), mailto, tel or cid address; fields later in the
+/// address are URL-encoded. An address that gets any other scheme from a field
+/// (<c>java{{x}}script:</c>) is emptied.
+/// <para>
+/// The HTML is read the way a browser reads it (tags, quoted and unquoted attributes,
+/// comments), in one pass: text that merely looks like an attribute is text, and values
+/// are never scanned again for fields.
+/// </para>
 /// </summary>
 public static partial class EmailTokens
 {
@@ -41,11 +48,20 @@ public static partial class EmailTokens
     [GeneratedRegex("^" + TokenSource, RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 5000)]
     private static partial Regex LeadingToken();
 
-    [GeneratedRegex("""(\shref\s*=\s*)(?:"([^"]*)"|'([^']*)')""", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 5000)]
-    private static partial Regex HrefAttribute();
+    [GeneratedRegex(@"^([A-Za-z][A-Za-z0-9+.\-]*):", RegexOptions.CultureInvariant)]
+    private static partial Regex Scheme();
 
-    [GeneratedRegex(@"^(https?://|mailto:|tel:)", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)]
-    private static partial Regex SafeLink();
+    [GeneratedRegex(@"[\t\n\r]")]
+    private static partial Regex UrlWhitespace();
+
+    /// <summary>Schemes an address may get from a merge field.</summary>
+    private static readonly HashSet<string> SafeSchemes = new(StringComparer.OrdinalIgnoreCase) { "http", "https", "mailto", "tel", "cid" };
+
+    /// <summary>Attributes whose value is an address.</summary>
+    private static readonly HashSet<string> UrlAttributes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "href", "src", "background", "action", "formaction", "xlink:href", "poster", "cite", "srcset", "data",
+    };
 
     [GeneratedRegex(@"\s*[\r\n]+\s*")]
     private static partial Regex LineBreaks();
@@ -103,18 +119,112 @@ public static partial class EmailTokens
         return merged;
     }
 
+    /// <summary>
+    /// One pass over the HTML: text and comments get HTML-encoded values; attribute values
+    /// with fields are merged, re-quoted and encoded, with address rules for address attributes.
+    /// </summary>
     private static string MergeHtml(string html, Resolver resolver)
     {
-        // Link addresses first: they need URL rules, not just HTML encoding.
-        var result = HrefAttribute().Replace(html, m =>
+        var sb = new StringBuilder(html.Length);
+        var i = 0;
+        while (i < html.Length)
         {
-            var raw = m.Groups[2].Success ? m.Groups[2].Value : m.Groups[3].Value;
-            if (!raw.Contains("{{", StringComparison.Ordinal)) return m.Value;
-            var href = MergeLink(WebUtility.HtmlDecode(raw), resolver);
-            return $"{m.Groups[1].Value}\"{WebUtility.HtmlEncode(href)}\"";
-        });
-        return Token().Replace(result, m => resolver.Resolve(m, html: true) is { } v ? WebUtility.HtmlEncode(v) : m.Value);
+            var lt = html.IndexOf('<', i);
+            var textEnd = lt < 0 ? html.Length : lt;
+            if (textEnd > i) sb.Append(MergeHtmlText(html[i..textEnd], resolver));
+            if (lt < 0) break;
+            if (string.CompareOrdinal(html, lt, "<!--", 0, 4) == 0)
+            {
+                var close = html.IndexOf("-->", lt + 4, StringComparison.Ordinal);
+                var end = close < 0 ? html.Length : close + 3;
+                sb.Append(MergeHtmlText(html[lt..end], resolver));
+                i = end;
+            }
+            else if (lt + 1 < html.Length && char.IsAsciiLetter(html[lt + 1]))
+            {
+                i = MergeTag(html, lt, sb, resolver);
+            }
+            else
+            {
+                sb.Append('<');
+                i = lt + 1;
+            }
+        }
+        return sb.ToString();
     }
+
+    private static string MergeHtmlText(string text, Resolver resolver)
+        => Token().Replace(text, m => resolver.Resolve(m, html: true) is { } v ? WebUtility.HtmlEncode(v) : m.Value);
+
+    /// <summary>
+    /// Copies the tag starting at <paramref name="start"/> (a '&lt;' followed by a letter) to
+    /// <paramref name="sb"/>, merging fields in attribute values. Follows the HTML tokenizer:
+    /// quotes only delimit a value right after '='. Returns the index after the tag.
+    /// </summary>
+    private static int MergeTag(string html, int start, StringBuilder sb, Resolver resolver)
+    {
+        var n = html.Length;
+        var i = start + 1;
+        while (i < n && !IsTagSpace(html[i]) && html[i] is not '/' and not '>') i++; // tag name
+        var copied = start;
+        while (i < n)
+        {
+            var c = html[i];
+            if (c == '>') { i++; break; }
+            if (IsTagSpace(c) || c == '/') { i++; continue; }
+
+            // Attribute name.
+            var nameStart = i;
+            i++; // a first '=' belongs to the name
+            while (i < n && !IsTagSpace(html[i]) && html[i] is not '/' and not '>' and not '=') i++;
+            var name = html[nameStart..i];
+            var j = i;
+            while (j < n && IsTagSpace(html[j])) j++;
+            if (j >= n || html[j] != '=') { i = j; continue; } // no value
+            j++;
+            while (j < n && IsTagSpace(html[j])) j++;
+            if (j >= n || html[j] == '>') { i = j; continue; } // empty unquoted value
+
+            // Value.
+            int valueStart = j, rawStart, rawEnd;
+            if (html[j] is '"' or '\'')
+            {
+                var close = html.IndexOf(html[j], j + 1);
+                rawStart = j + 1;
+                rawEnd = close < 0 ? n : close;
+                i = close < 0 ? n : close + 1;
+            }
+            else
+            {
+                rawStart = j;
+                while (j < n && !IsTagSpace(html[j]) && html[j] != '>') j++;
+                rawEnd = j;
+                i = j;
+            }
+
+            var raw = html[rawStart..rawEnd];
+            if (!raw.Contains("{{", StringComparison.Ordinal)) continue;
+            var decoded = WebUtility.HtmlDecode(raw);
+            var merged = UrlAttributes.Contains(name)
+                ? MergeAddress(decoded, resolver)
+                : Token().Replace(decoded, m => resolver.Resolve(m, html: false) ?? m.Value);
+            sb.Append(html, copied, valueStart - copied).Append('"').Append(WebUtility.HtmlEncode(merged)).Append('"');
+            copied = i;
+        }
+        sb.Append(html, copied, i - copied);
+        return i;
+    }
+
+    /// <summary>Removes leading and trailing C0 control characters and spaces, as browsers do with addresses.</summary>
+    private static string TrimControls(string s)
+    {
+        int start = 0, end = s.Length;
+        while (start < end && s[start] <= ' ') start++;
+        while (end > start && s[end - 1] <= ' ') end--;
+        return s[start..end];
+    }
+
+    private static bool IsTagSpace(char c) => c is ' ' or '\t' or '\n' or '\r' or '\f';
 
     private static string MergeText(string text, Resolver resolver) => Token().Replace(text, m => resolver.Resolve(m, html: false) ?? m.Value);
 
@@ -124,22 +234,36 @@ public static partial class EmailTokens
         return key => values.TryGetValue(key, out var v) ? v : null;
     }
 
-    private static string MergeLink(string href, Resolver resolver)
+    /// <summary>
+    /// Merges an address: a leading field is the base and is used as is (it must give an
+    /// http(s), mailto, tel or cid address); later fields are URL-encoded. When any field
+    /// was replaced, an address that ends up with another scheme is emptied.
+    /// </summary>
+    private static string MergeAddress(string address, Resolver resolver)
     {
-        var rest = href.Trim();
+        var rest = address.Trim();
         var result = string.Empty;
         var lead = LeadingToken().Match(rest);
         var leadingReplaced = false;
+        var replaced = false;
         if (lead.Success)
         {
-            var v = resolver.Resolve(lead, html: true);
+            var v = resolver.Resolve(lead, html: false);
             result = v?.Trim() ?? lead.Value;
-            leadingReplaced = v is not null;
+            leadingReplaced = replaced = v is not null;
             rest = rest[lead.Length..];
         }
-        result += Token().Replace(rest, m => resolver.Resolve(m, html: true) is { } v ? Uri.EscapeDataString(v) : m.Value);
-        // A value that is the start of the address decides where it goes: only safe schemes.
-        return leadingReplaced && !SafeLink().IsMatch(result) ? string.Empty : result;
+        result += Token().Replace(rest, m =>
+        {
+            if (resolver.Resolve(m, html: false) is not { } v) return m.Value;
+            replaced = true;
+            return Uri.EscapeDataString(v);
+        });
+        if (!replaced) return result;
+        // Browsers ignore tabs and line breaks in addresses, and leading/trailing control characters and spaces.
+        var scheme = Scheme().Match(TrimControls(UrlWhitespace().Replace(result, string.Empty)));
+        if (scheme.Success ? !SafeSchemes.Contains(scheme.Groups[1].Value) : leadingReplaced) return string.Empty;
+        return result;
     }
 
     private sealed class Resolver(Func<string, string?> values, MissingTokenBehavior missing)

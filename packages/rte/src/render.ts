@@ -87,9 +87,13 @@ const HEADING_SCALE: Record<number, number> = { 1: 1.75, 2: 1.5, 3: 1.25 };
 const INDENT_PX = 24;
 const px = (n: number) => (n ? `${n}px` : '0');
 const LINK_PROTOCOL = /^(https?:\/\/|mailto:|tel:)/i;
-/** A template link starting with a merge field (`{{unsubscribeUrl}}`, `{{site}}/account`), checked again once replaced. */
-const TOKEN_LINK = new RegExp(`^${TOKEN_PATTERN.source}`);
-const isLink = (href: string) => LINK_PROTOCOL.test(href) || TOKEN_LINK.test(href);
+/**
+ * A template link starting with a merge field (`{{unsubscribeUrl}}`, `{{site}}/account`), checked again once replaced.
+ * The field must be the whole base: only a path, query or fragment may follow, so `{{x}}javascript:…` is not a link.
+ */
+export const TOKEN_LINK = new RegExp(`^${TOKEN_PATTERN.source}(?=$|[/?#])`);
+/** An address a link may have: http(s), mailto or tel, or one starting with a merge field. */
+export const isLink = (href: string) => LINK_PROTOCOL.test(href) || TOKEN_LINK.test(href);
 const IMAGE_PROTOCOL = /^https?:\/\//i;
 /** Embedded images: base64 PNG, JPEG or GIF only (what Outlook and Gmail display). */
 export const EMBEDDED_IMAGE = /^data:image\/(png|jpeg|gif);base64,[A-Za-z0-9+/]+={0,2}$/;
@@ -101,8 +105,13 @@ export function isImageSource(src: unknown): src is string {
 
 // ------------------------------------------------------------ values ---
 
-export const escapeText = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-export const escapeAttr = (s: string) => escapeText(s).replace(/"/g, '&quot;');
+/**
+ * Escapes text for HTML. Quotes are escaped too, so text can never look like an
+ * attribute to code that post-processes the HTML (merging fields, extracting images).
+ */
+export const escapeText = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+export const escapeAttr = escapeText;
 
 const NAMED: Record<string, string> = {
   black: '#000000', white: '#ffffff', red: '#ff0000', yellow: '#ffff00', lime: '#00ff00', green: '#008000',
@@ -167,7 +176,11 @@ export function asSection(value: unknown): SectionValue | null {
   const given = Array.isArray(v.columns) ? v.columns : [];
   const columns = Array.from({ length: n }, (_, i) => (Array.isArray(given[i]) ? (given[i] as DeltaOp[]) : []));
   // Extra columns (never produced by the editor) are kept, in the last column.
-  for (let i = n; i < given.length; i++) if (Array.isArray(given[i])) columns[n - 1] = [...columns[n - 1], ...(given[i] as DeltaOp[])];
+  if (given.length > n) {
+    const lastColumn = [...columns[n - 1]];
+    for (let i = n; i < given.length; i++) if (Array.isArray(given[i])) for (const op of given[i] as DeltaOp[]) lastColumn.push(op);
+    columns[n - 1] = lastColumn;
+  }
   return { layout, columns };
 }
 
@@ -499,8 +512,17 @@ export function deltaToEmailHtml(delta: DeltaLike, styleOverrides: Partial<Email
   return renderDelta(delta, styleOverrides, 0);
 }
 
+/** A number from a style override, clamped to [min, max]; the default when not a finite number. */
+const clampNumber = (value: unknown, min: number, max: number, fallback: number) => {
+  const n = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : NaN;
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+};
+
 function renderDelta(delta: DeltaLike, styleOverrides: Partial<EmailStyle>, depth: number): string {
   const style: EmailStyle = { ...DEFAULT_STYLE, ...styleOverrides };
+  style.blockSpacing = Math.round(clampNumber(style.blockSpacing, 0, 100, DEFAULT_STYLE.blockSpacing));
+  style.maxImageWidth = Math.round(clampNumber(style.maxImageWidth, 50, 2000, DEFAULT_STYLE.maxImageWidth));
+  style.lineHeight = clampNumber(style.lineHeight, 0.5, 5, DEFAULT_STYLE.lineHeight);
   style.color = normColor(style.color) ?? DEFAULT_STYLE.color;
   style.linkColor = normColor(style.linkColor) ?? DEFAULT_STYLE.linkColor;
   style.ruleColor = normColor(style.ruleColor) ?? DEFAULT_STYLE.ruleColor;
@@ -521,8 +543,10 @@ function renderDelta(delta: DeltaLike, styleOverrides: Partial<EmailStyle>, dept
         case 'section': {
           const section = asSection(g.lines[0].runs[0]?.embed?.section);
           if (!section) return '';
-          // Columns never nest: a section inside a column is shown as its columns' content.
-          if (depth > 0) return renderDelta({ ops: section.columns.flat() }, style, depth);
+          // Columns never nest: a section inside a column is shown as its columns' content,
+          // and anything nested deeper (never produced by the editor) is dropped.
+          if (depth > 1) return '';
+          if (depth > 0) return renderDelta({ ops: section.columns.flat() }, style, depth + 1);
           return renderSection(section, style, mb, depth);
         }
         case 'button': {
@@ -538,6 +562,10 @@ function renderDelta(delta: DeltaLike, styleOverrides: Partial<EmailStyle>, dept
 
 /** Render a Delta as plain text, for the text/plain part of an email. */
 export function deltaToPlainText(delta: DeltaLike): string {
+  return plainText(delta, 0);
+}
+
+function plainText(delta: DeltaLike, depth: number): string {
   const lines = trimTrailing(toLines(delta));
   const counters: { type: unknown; n: number }[] = [];
   const out: string[] = [];
@@ -547,9 +575,10 @@ export function deltaToPlainText(delta: DeltaLike): string {
       continue;
     }
     if (line.attrs.section) {
-      // Columns one after another, as on a phone.
-      const section = asSection(line.runs[0]?.embed?.section);
-      const parts = (section?.columns ?? []).map((ops) => deltaToPlainText({ ops })).filter(Boolean);
+      // Columns one after another, as on a phone. Sections nested more than once (never
+      // produced by the editor) are dropped, as in the HTML.
+      const section = depth < 2 ? asSection(line.runs[0]?.embed?.section) : null;
+      const parts = (section?.columns ?? []).map((ops) => plainText({ ops }, depth + 1)).filter(Boolean);
       if (parts.length) out.push(parts.join('\n\n'));
       continue;
     }
