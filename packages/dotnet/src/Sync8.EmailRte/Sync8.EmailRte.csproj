@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Sync8.EmailRte</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- NuGet package metadata (packable, not published by CI) -->
+    <PackageId>Sync8.EmailRte</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>sync8</Authors>
+    <Description>Server side of the @sync8/email-rte editor: fill merge fields in email HTML and text, turn embedded data: pictures into inline attachments, and send over SMTP (MailKit). No ASP.NET dependency.</Description>
+    <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
+    <PackageTags>email;rich-text;merge-fields;smtp;outlook;inline-images;mailkit</PackageTags>
+    <RepositoryUrl>https://github.com/devops-sync8/email-rte</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MailKit" Version="4.18.0" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build npm packages and the demo
+        run: npm run build
+
+      # After the build: dependants typecheck against the editor's emitted .d.ts.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Install Chromium for editor tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Editor and tooling tests
+        run: npm test
+
+      - name: Export editor output for the .NET MJML compatibility test
+        run: npm run export-fixture
+
+      - name: .NET build and test
+        run: dotnet test EmailRte.sln -c Release
+
+      - name: Pack NuGet package (not published)
+        run: dotnet pack packages/dotnet/src/Sync8.EmailRte/Sync8.EmailRte.csproj -c Release -o artifacts
+
+      - name: Pack npm packages (not published)
+        run: |
+          mkdir -p artifacts
+          npm pack -w @sync8/email-rte -w @sync8/email-rte-react --pack-destination artifacts
+          npm pack ./packages/rte-angular/dist --pack-destination artifacts
+
+      - name: CDN / third-party host check on shipped files
+        run: npm run cdn:check
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: artifacts/
+          retention-days: 7
+
+  licenses:
+    name: License check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Restore NuGet packages
+        run: dotnet restore EmailRte.sln
+
+      - name: Fail on GPL/LGPL/AGPL/SSPL or unknown licenses
+        run: npm run license:check
+
+      - name: THIRD_PARTY_NOTICES.md is up to date
+        run: npm run license:notices:check

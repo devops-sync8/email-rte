@@ -1,0 +1,52 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "packages", "packages", "{241F0188-96CE-4B9F-A300-95F8970C3C95}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dotnet", "dotnet", "{B63924A0-5928-49B0-BB66-5060D181DB52}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{889D7599-CBD2-4761-A93D-6998677D656E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sync8.EmailRte", "packages\dotnet\src\Sync8.EmailRte\Sync8.EmailRte.csproj", "{CC46B0F2-06EB-4B72-A3C2-AABDA3368F79}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{06201E8F-7EBE-4DB8-BE69-5DDAD591CB23}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sync8.EmailRte.Tests", "packages\dotnet\tests\Sync8.EmailRte.Tests\Sync8.EmailRte.Tests.csproj", "{9DE601C1-04A5-4095-88C2-FB0C287A74F1}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{7467C126-974B-4D2C-86A2-FB0BD45BF3D9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EmailRte.Sample.Host", "samples\host\EmailRte.Sample.Host.csproj", "{BA157432-F169-4285-AE22-DDFFB4DB4497}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CC46B0F2-06EB-4B72-A3C2-AABDA3368F79}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CC46B0F2-06EB-4B72-A3C2-AABDA3368F79}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CC46B0F2-06EB-4B72-A3C2-AABDA3368F79}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CC46B0F2-06EB-4B72-A3C2-AABDA3368F79}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9DE601C1-04A5-4095-88C2-FB0C287A74F1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9DE601C1-04A5-4095-88C2-FB0C287A74F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9DE601C1-04A5-4095-88C2-FB0C287A74F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9DE601C1-04A5-4095-88C2-FB0C287A74F1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BA157432-F169-4285-AE22-DDFFB4DB4497}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BA157432-F169-4285-AE22-DDFFB4DB4497}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BA157432-F169-4285-AE22-DDFFB4DB4497}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BA157432-F169-4285-AE22-DDFFB4DB4497}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{B63924A0-5928-49B0-BB66-5060D181DB52} = {241F0188-96CE-4B9F-A300-95F8970C3C95}
+		{889D7599-CBD2-4761-A93D-6998677D656E} = {B63924A0-5928-49B0-BB66-5060D181DB52}
+		{CC46B0F2-06EB-4B72-A3C2-AABDA3368F79} = {889D7599-CBD2-4761-A93D-6998677D656E}
+		{06201E8F-7EBE-4DB8-BE69-5DDAD591CB23} = {B63924A0-5928-49B0-BB66-5060D181DB52}
+		{9DE601C1-04A5-4095-88C2-FB0C287A74F1} = {06201E8F-7EBE-4DB8-BE69-5DDAD591CB23}
+		{BA157432-F169-4285-AE22-DDFFB4DB4497} = {7467C126-974B-4D2C-86A2-FB0BD45BF3D9}
+	EndGlobalSection
+EndGlobal

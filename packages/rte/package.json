@@ -1,0 +1,47 @@
+{
+  "name": "@sync8/email-rte",
+  "version": "0.1.0",
+  "description": "Inline rich text editor for React, Angular or plain pages that produces email-safe HTML for Outlook desktop, Outlook on the web and Gmail. Keeps formatting when pasting from Word and Google Docs. Built on Quill.",
+  "license": "BSD-3-Clause",
+  "author": "sync8",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./render": {
+      "types": "./dist/render.d.ts",
+      "import": "./dist/render.js"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": ["dist", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md"],
+  "sideEffects": ["*.css"],
+  "keywords": ["rich-text", "wysiwyg", "editor", "email", "outlook", "gmail", "paste-from-word", "react", "angular"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devops-sync8/email-rte.git",
+    "directory": "packages/rte"
+  },
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --test test/*.test.mjs",
+    "prepack": "node -e \"require('fs').copyFileSync('../../THIRD_PARTY_NOTICES.md','THIRD_PARTY_NOTICES.md')\""
+  },
+  "dependencies": {
+    "quill": "2.0.3"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

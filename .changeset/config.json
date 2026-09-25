@@ -1,0 +1,23 @@
+{
+  "$schema": "../node_modules/@changesets/config/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [],
+  "linked": [
+    [
+      "@sync8/email-rte",
+      "@sync8/email-rte-react",
+      "@sync8/email-rte-angular"
+    ]
+  ],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": [
+    "email-rte-demo"
+  ],
+  "privatePackages": {
+    "version": true,
+    "tag": false
+  }
+}

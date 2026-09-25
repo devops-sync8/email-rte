@@ -1,0 +1,5 @@
+{
+  "MailKit@4.18.0": "https://raw.githubusercontent.com/jstedfast/MailKit/4.18.0/LICENSE",
+  "MimeKit@4.18.0": "https://raw.githubusercontent.com/jstedfast/MimeKit/4.18.0/LICENSE",
+  "System.Security.Cryptography.Pkcs@10.0.0": "https://raw.githubusercontent.com/dotnet/dotnet/b0f34d51fccc69fd334253924abd8d6853fad7aa/LICENSE.TXT"
+}

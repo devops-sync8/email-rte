@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Inline Email Editor</title>
+  </head>
+  <body>
+    <main class="page">
+      <header class="intro">
+        <h1>Inline email editor</h1>
+        <p>Pick a template, add columns and buttons, write or paste from Word (pictures included), add merge fields such as a first name, then check the email as Outlook and Gmail will get it: inline styles only, fixed-width layout for Outlook desktop, fluid on phones.</p>
+      </header>
+
+      <section class="compose" aria-label="Compose">
+        <div class="field">
+          <label for="to">To</label>
+          <input id="to" type="email" value="team@example.com" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="subject">Subject</label>
+          <input id="subject" type="text" value="Quarterly update" autocomplete="off" />
+        </div>
+        <div class="field">
+          <span class="label" id="message-label">Message</span>
+          <div id="editor"></div>
+        </div>
+        <div class="actions">
+          <button type="button" id="load-word">Paste a Word sample</button>
+          <button type="button" id="load-sample">Load example content</button>
+          <button type="button" id="clear">Clear</button>
+          <button type="button" id="send" class="primary" hidden>Send test email</button>
+        </div>
+        <p id="send-status" class="send-status" role="status" hidden></p>
+      </section>
+
+      <section class="output" aria-label="Output">
+        <fieldset class="recipient">
+          <legend>Sample recipient (fills the merge fields)</legend>
+          <div class="field"><label for="v-firstName">First name</label><input id="v-firstName" data-token="firstName" value="Ann" autocomplete="off" /></div>
+          <div class="field"><label for="v-company">Company</label><input id="v-company" data-token="company" value="Acme" autocomplete="off" /></div>
+        </fieldset>
+        <div class="tabs" role="tablist">
+          <button role="tab" id="tab-preview" aria-selected="true" aria-controls="panel-preview">Email preview</button>
+          <button role="tab" id="tab-html" aria-selected="false" aria-controls="panel-html">HTML</button>
+          <button role="tab" id="tab-text" aria-selected="false" aria-controls="panel-text">Plain text</button>
+        </div>
+        <div id="panel-preview" role="tabpanel" aria-labelledby="tab-preview">
+          <div class="widths">
+            <button type="button" data-width="desktop" aria-pressed="true">Desktop</button>
+            <button type="button" data-width="375px" aria-pressed="false">Phone (375px)</button>
+          </div>
+          <div class="frame-wrap"><iframe id="preview" title="Email preview" sandbox=""></iframe></div>
+        </div>
+        <div id="panel-html" role="tabpanel" aria-labelledby="tab-html" hidden>
+          <div class="panel-bar"><span id="html-size" class="meta"></span><button type="button" id="copy-html">Copy HTML</button></div>
+          <pre id="html-out" tabindex="0"></pre>
+        </div>
+        <div id="panel-text" role="tabpanel" aria-labelledby="tab-text" hidden>
+          <pre id="text-out" tabindex="0"></pre>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,45 @@
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+.vite/
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+*.nupkg
+*.snupkg
+artifacts/
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Secrets / local settings: only appsettings.example.json is committed
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
+secrets.json
+.env
+.env.*
+
+# Sample runtime output
+samples/host/wwwroot/
+samples/host/uploads/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+packages/rte/THIRD_PARTY_NOTICES.md
+packages/rte-react/test/dist/
+packages/rte-angular/test/dist/
+samples/rte-demo/dist/

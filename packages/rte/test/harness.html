@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/packages/rte/dist/style.css" />
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; background: #fafafa; }
+      /* Host-page styles the editor must not be affected by */
+      p { margin: 40px 0; color: purple; }
+      /* Aggressive global control styles, as frameworks often ship */
+      button { min-height: 44px; min-width: 88px; padding: 10px 20px; border: 2px solid red; margin: 6px; background: pink; text-transform: uppercase; }
+      input { padding: 18px; margin: 10px; border: 3px solid red; width: 100%; font-size: 22px; }
+      label { display: block; font-weight: 600; margin: 12px 0 6px; }
+      .card { max-width: 760px; margin: 0 auto; background: #fff; padding: 16px; border-radius: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <label for="subject">Subject</label>
+      <input id="subject" value="Quarterly update" style="width:100%;font:inherit;padding:6px" />
+      <label>Message</label>
+      <div id="editor"></div>
+      <p id="after">Text after the editor on the host page.</p>
+    </div>
+    <script type="module">
+      import * as api from '/packages/rte/dist/index.js';
+      import * as render from '/packages/rte/dist/render.js';
+      window.rte = api;
+      window.render = render;
+      window.changes = [];
+      window.uploads = [];
+      window.uploadSignals = [];
+      window.uploadDelay = 0;
+      window.ed = api.createRichTextEditor('#editor', {
+        placeholder: 'Write your message…',
+        onChange: (v) => window.changes.push(v),
+        // window.uploadDelay (ms) simulates a slow upload; the signal aborts it when the user cancels.
+        uploadImage: async (file, { signal }) => {
+          window.uploads.push(file.name);
+          window.uploadSignals.push(signal);
+          if (window.uploadDelay) {
+            await new Promise((resolve, reject) => {
+              const timer = setTimeout(resolve, window.uploadDelay);
+              signal.addEventListener('abort', () => {
+                clearTimeout(timer);
+                reject(signal.reason);
+              });
+            });
+          }
+          return `https://images.example.com/${encodeURIComponent(file.name)}`;
+        },
+      });
+      window.harnessReady = true;
+    </script>
+  </body>
+</html>

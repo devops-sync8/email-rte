@@ -1,0 +1,7 @@
+{
+  "name": "@sync8/email-rte-dotnet",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Version carrier for the Sync8.EmailRte NuGet package so Changesets can version it. Synced into Sync8.EmailRte.csproj by scripts/sync-dotnet-version.mjs.",
+  "license": "BSD-3-Clause"
+}

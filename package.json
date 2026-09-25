@@ -1,0 +1,31 @@
+{
+  "name": "email-rte-monorepo",
+  "private": true,
+  "license": "BSD-3-Clause",
+  "workspaces": [
+    "packages/rte",
+    "packages/rte-react",
+    "packages/rte-angular",
+    "packages/dotnet",
+    "samples/rte-demo"
+  ],
+  "scripts": {
+    "build": "npm run build -w @sync8/email-rte && npm run build -w @sync8/email-rte-react && npm run build -w @sync8/email-rte-angular && npm run build -w email-rte-demo",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm test --workspaces --if-present && node --test scripts/lib/licenses.test.mjs",
+    "export-fixture": "node scripts/export-rte-fixture.mjs",
+    "license:check": "node scripts/check-licenses.mjs",
+    "license:notices": "node scripts/generate-notices.mjs",
+    "cdn:check": "node scripts/check-cdn.mjs",
+    "changeset": "changeset",
+    "version-packages": "changeset version && node scripts/sync-dotnet-version.mjs && npm install --package-lock-only",
+    "license:notices:check": "node scripts/generate-notices.mjs --check"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^3.0.3",
+    "license-checker": "^25.0.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

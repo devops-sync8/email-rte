@@ -1,0 +1,46 @@
+{
+  "name": "@sync8/email-rte-react",
+  "version": "0.1.0",
+  "description": "React component for @sync8/email-rte: an inline rich text editor producing email-safe HTML for Outlook and Gmail.",
+  "license": "BSD-3-Clause",
+  "author": "sync8",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devops-sync8/email-rte.git",
+    "directory": "packages/rte-react"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vite build --config test/vite.config.mjs && node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@sync8/email-rte": "^0.1.0"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
