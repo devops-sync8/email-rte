@@ -91,6 +91,13 @@ if (args.has('--check')) {
   const current = existsSync(target) ? readFileSync(target, 'utf8') : '';
   if (current !== md) {
     console.error('THIRD_PARTY_NOTICES.md is out of date; run `npm run license:notices` and commit the result.');
+    // Show where it differs, so a CI failure can be understood without reproducing it.
+    const [have, want] = [current.split('\n'), md.split('\n')];
+    const shown = [];
+    for (let i = 0; i < Math.max(have.length, want.length) && shown.length < 20; i++) {
+      if (have[i] !== want[i]) shown.push(`line ${i + 1}:\n  committed: ${have[i] ?? '(none)'}\n  generated: ${want[i] ?? '(none)'}`);
+    }
+    console.error(shown.join('\n'));
     process.exit(1);
   }
   console.log(`THIRD_PARTY_NOTICES.md is up to date (${all.length} packages).`);
